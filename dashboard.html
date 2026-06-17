@@ -196,10 +196,34 @@
     }
     window.__renderTable = renderTable;
 
+    function uniqueVals(field) { return [...new Set(state.rows.map((r)=>r[field]).filter(Boolean))].sort(); }
+
+    function renderFilters() {
+      const media = uniqueVals('media').map((v)=>`<option value="${v}" ${state.filters.media===v?'selected':''}>${v}</option>`).join('');
+      const device = uniqueVals('device').map((v)=>`<option value="${v}" ${state.filters.device===v?'selected':''}>${v}</option>`).join('');
+      document.getElementById('filters').innerHTML = `
+        <label>기간 <input type="date" id="fFrom" value="${state.filters.from}"></label>
+        <span>~</span>
+        <label><input type="date" id="fTo" value="${state.filters.to}"></label>
+        <label>매체 <select id="fMedia"><option value="ALL">전체</option>${media}</select></label>
+        <label>디바이스 <select id="fDevice"><option value="ALL">전체</option>${device}</select></label>`;
+      document.getElementById('fFrom').onchange=(e)=>{ state.filters.from=e.target.value; onFilterChange(); };
+      document.getElementById('fTo').onchange=(e)=>{ state.filters.to=e.target.value; onFilterChange(); };
+      document.getElementById('fMedia').onchange=(e)=>{ state.filters.media=e.target.value; onFilterChange(); };
+      document.getElementById('fDevice').onchange=(e)=>{ state.filters.device=e.target.value; onFilterChange(); };
+    }
+
+    function onFilterChange() {
+      if (currentRows().length === 0) { showStatus('해당 조건에 데이터가 없습니다.'); }
+      else { hideStatus(); }
+      autoSelectTop();
+      renderKPIs(); renderTrend(); renderTable();
+    }
+    window.__renderFilters = renderFilters;
+
     function renderAll() {
+      renderFilters();
       renderKPIs();
-      // renderFilters 는 이후 태스크에서 채움
-      if (window.__renderFilters) window.__renderFilters();
       renderChartToolbar();
       autoSelectTop();
       renderTrend();

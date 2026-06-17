@@ -26,3 +26,8 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,
 .grid tbody tr { cursor:pointer; }
 .grid tbody tr:hover { background:#f3f5f9; }
 .grid tbody tr.sel { background:#eef2ff; }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.topbar h1 { font-size:18px; margin:0; }
+.filters { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+.filters input, .filters select { border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:13px; color:var(--text); }
+@media (max-width:720px){ .kpis .kpi{ flex:1 1 40%; } .grid{ font-size:12px; } }
