@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNumber, parseRows } from '../lib/metrics.js';
+import { parseNumber, parseRows, deriveMetrics } from '../lib/metrics.js';
 
 test('parseNumber: 콤마 제거', () => {
   assert.equal(parseNumber('336,481'), 336481);
@@ -36,4 +36,22 @@ test('parseRows: 필드 타입 변환', () => {
   assert.equal(rows[0].revenue, 336481);
   assert.equal(rows[0].device, 'PC');
   assert.equal(rows[1].conclusion, 0);
+});
+
+test('deriveMetrics: 정상 계산', () => {
+  const m = deriveMetrics({ impression:100, click:10, cost:5000, conclusion:2, revenue:20000 });
+  assert.equal(m.ctr, 0.1);
+  assert.equal(m.cpc, 500);
+  assert.equal(m.cvr, 0.2);
+  assert.equal(m.cpa, 2500);
+  assert.equal(m.roas, 4);
+});
+
+test('deriveMetrics: 분모 0 → null', () => {
+  const m = deriveMetrics({ impression:0, click:0, cost:0, conclusion:0, revenue:0 });
+  assert.equal(m.ctr, null);
+  assert.equal(m.cpc, null);
+  assert.equal(m.cvr, null);
+  assert.equal(m.cpa, null);
+  assert.equal(m.roas, null);
 });
