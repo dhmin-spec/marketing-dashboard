@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNumber, parseRows, deriveMetrics, filterRows, aggregateKeywords } from '../lib/metrics.js';
+import { parseNumber, parseRows, deriveMetrics, filterRows, aggregateKeywords, topNKeywords, buildTrendSeries } from '../lib/metrics.js';
 
 test('parseNumber: 콤마 제거', () => {
   assert.equal(parseNumber('336,481'), 336481);
@@ -78,4 +78,26 @@ test('aggregateKeywords: 합산 후 비율', () => {
   assert.equal(kw.revenue, 595313);   // 336481+258832
   // CTR = 108/872 (가중)
   assert.ok(Math.abs(kw.ctr - 108 / 872) < 1e-9);
+});
+
+test('topNKeywords: 전환수 상위', () => {
+  const agg = aggregateKeywords(ROWS);
+  const top = topNKeywords(agg, 'conclusion', 1);
+  assert.deepEqual(top, ['여행자보험.']);  // 23 vs 0
+});
+
+test('buildTrendSeries: 날짜별 CVR', () => {
+  const { dates, series } = buildTrendSeries(ROWS, ['여행자보험.'], 'cvr');
+  assert.deepEqual(dates, ['2025-10-31','2025-11-01']);
+  const s = series[0];
+  assert.equal(s.keyword, '여행자보험.');
+  assert.ok(Math.abs(s.data[0] - 13 / 64) < 1e-9);  // 10-31
+  assert.ok(Math.abs(s.data[1] - 10 / 44) < 1e-9);  // 11-01
+});
+
+test('buildTrendSeries: 데이터 없는 날짜는 null', () => {
+  const { series } = buildTrendSeries(ROWS, ['KB여행자보험'], 'cvr');
+  // KB여행자보험은 10-31만 존재, click=1 conclusion=0 → cvr 0; 11-01 없음 → null
+  assert.equal(series[0].data[0], 0);
+  assert.equal(series[0].data[1], null);
 });
