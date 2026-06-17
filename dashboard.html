@@ -38,6 +38,9 @@
       metric: 'cvr',
       rankBy: 'conclusion',
       selectedKeywords: [],
+      sortKey: 'conclusion',
+      sortDir: 'desc',
+      search: '',
     };
     window.__state = state; // 디버깅용
 
@@ -148,14 +151,61 @@
     window.__renderTrend = renderTrend;
     window.__renderChartToolbar = renderChartToolbar;
 
+    const COLS = [
+      ['keyword','키워드','text'],['impression','노출','int'],['click','클릭','int'],
+      ['ctr','CTR','pct'],['cost','비용','won'],['cpc','CPC','won'],
+      ['conclusion','전환','int'],['cvr','CVR','pct'],['cpa','CPA','won'],
+      ['revenue','매출','won'],['roas','ROAS','roas'],
+    ];
+    const fmt = {
+      text:(v)=>v, int:(v)=>Math.round(v).toLocaleString('ko-KR'),
+      pct:(v)=>v==null?'-':(v*100).toFixed(1)+'%',
+      won:(v)=>v==null?'-':'₩'+Math.round(v).toLocaleString('ko-KR'),
+      roas:(v)=>v==null?'-':(v*100).toFixed(0)+'%',
+    };
+
+    function renderTable() {
+      let agg = aggregateKeywords(currentRows());
+      if (state.search) agg = agg.filter((a)=>a.keyword.includes(state.search));
+      agg.sort((a,b)=>{
+        const av=a[state.sortKey], bv=b[state.sortKey];
+        const an=av==null?-Infinity:av, bn=bv==null?-Infinity:bv;
+        if (typeof av==='string') return state.sortDir==='asc'?String(av).localeCompare(bv):String(bv).localeCompare(av);
+        return state.sortDir==='asc'?an-bn:bn-an;
+      });
+      agg = agg.slice(0, 200);
+      const head = COLS.map(([k,l])=>`<th data-key="${k}" class="${state.sortKey===k?'sorted '+state.sortDir:''}">${l}</th>`).join('');
+      const body = agg.map((a)=>{
+        const sel = state.selectedKeywords.includes(a.keyword) ? 'sel' : '';
+        const tds = COLS.map(([k,,t])=>`<td class="${t==='text'?'l':'r'}">${fmt[t](a[k])}</td>`).join('');
+        return `<tr class="${sel}" data-kw="${a.keyword}">${tds}</tr>`;
+      }).join('');
+      document.getElementById('tableWrap').innerHTML = `<table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+      document.querySelectorAll('.grid th').forEach((th)=>th.onclick=()=>{
+        const k=th.dataset.key;
+        if (state.sortKey===k) state.sortDir = state.sortDir==='asc'?'desc':'asc';
+        else { state.sortKey=k; state.sortDir = k==='keyword'?'asc':'desc'; }
+        renderTable();
+      });
+      document.querySelectorAll('.grid tbody tr').forEach((tr)=>tr.onclick=()=>{
+        const kw=tr.dataset.kw;
+        if (state.selectedKeywords.includes(kw)) state.selectedKeywords = state.selectedKeywords.filter((k)=>k!==kw);
+        else state.selectedKeywords = [...state.selectedKeywords, kw];
+        renderTrend(); renderTable();
+      });
+    }
+    window.__renderTable = renderTable;
+
     function renderAll() {
       renderKPIs();
-      // renderFilters / renderTable 는 이후 태스크에서 채움
+      // renderFilters 는 이후 태스크에서 채움
       if (window.__renderFilters) window.__renderFilters();
       renderChartToolbar();
       autoSelectTop();
       renderTrend();
-      if (window.__renderTable) window.__renderTable();
+      renderTable();
+      const search = document.getElementById('search');
+      if (search && !search.__bound) { search.__bound = true; search.oninput = (e)=>{ state.search = e.target.value.trim(); renderTable(); }; }
     }
 
     window.__loadData = loadData;

@@ -15,3 +15,14 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,
 #rankSel { border:1px solid var(--line); border-radius:8px; padding:5px 8px; }
 .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .chip { font-size:12px; padding:3px 10px; border-radius:14px; cursor:pointer; color:#fff; background:var(--c,#3b5bdb); }
+.table-toolbar { margin-bottom:10px; }
+#search { width:240px; border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+.grid { width:100%; border-collapse:collapse; font-size:13px; }
+.grid th, .grid td { padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.grid th { text-align:right; cursor:pointer; color:var(--muted); font-weight:600; user-select:none; }
+.grid th:first-child, .grid td.l { text-align:left; }
+.grid td.r { text-align:right; }
+.grid th.sorted { color:var(--accent); }
+.grid tbody tr { cursor:pointer; }
+.grid tbody tr:hover { background:#f3f5f9; }
+.grid tbody tr.sel { background:#eef2ff; }
