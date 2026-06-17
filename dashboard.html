@@ -138,7 +138,6 @@
     }
 
     function renderChips(series) {
-      const all = aggregateKeywords(currentRows()).map((a)=>a.keyword);
       const chips = state.selectedKeywords.map((kw, i) =>
         `<span class="chip" style="--c:${COLORS[i % COLORS.length]}" data-kw="${kw}">${kw} ✕</span>`).join('');
       document.getElementById('chips').innerHTML = chips;
