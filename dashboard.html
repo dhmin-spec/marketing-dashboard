@@ -97,11 +97,64 @@
       ).join('');
     }
 
+    let chart;
+    const METRICS = [['cvr','CVR'],['ctr','CTR'],['cpa','CPA'],['roas','ROAS']];
+    const RANKS = [['conclusion','전환수'],['cost','비용'],['revenue','매출'],['click','클릭']];
+    const COLORS = ['#3b5bdb','#16a34a','#dc2626','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d'];
+
+    function renderChartToolbar() {
+      const m = METRICS.map(([k,l]) => `<button class="seg ${state.metric===k?'on':''}" data-metric="${k}">${l}</button>`).join('');
+      const r = RANKS.map(([k,l]) => `<option value="${k}" ${state.rankBy===k?'selected':''}>${l} 상위</option>`).join('');
+      document.getElementById('chartToolbar').innerHTML =
+        `<div class="segs">${m}</div><select id="rankSel">${r}</select>`;
+      document.querySelectorAll('.seg').forEach((b) => b.onclick = () => { state.metric = b.dataset.metric; renderTrend(); renderChartToolbar(); });
+      document.getElementById('rankSel').onchange = (e) => { state.rankBy = e.target.value; autoSelectTop(); renderTrend(); };
+    }
+
+    function autoSelectTop() {
+      const agg = aggregateKeywords(currentRows());
+      state.selectedKeywords = topNKeywords(agg, state.rankBy, 5);
+    }
+
+    function renderTrend() {
+      if (!chart) chart = echarts.init(document.getElementById('trendChart'));
+      const rows = currentRows();
+      if (state.selectedKeywords.length === 0) autoSelectTop();
+      const { dates, series } = buildTrendSeries(rows, state.selectedKeywords, state.metric);
+      const isPct = state.metric === 'cvr' || state.metric === 'ctr';
+      chart.setOption({
+        color: COLORS,
+        tooltip: { trigger:'axis', valueFormatter:(v)=> v==null?'-':(isPct?(v*100).toFixed(1)+'%':Math.round(v).toLocaleString()) },
+        legend: { show:false },
+        grid: { left:48, right:16, top:16, bottom:32 },
+        xAxis: { type:'category', data:dates },
+        yAxis: { type:'value', axisLabel:{ formatter:(v)=> isPct?(v*100).toFixed(0)+'%':v } },
+        series: series.map((s) => ({ name:s.keyword, type:'line', data:s.data, connectNulls:true, smooth:true, symbolSize:6 })),
+      }, true);
+      renderChips(series);
+    }
+
+    function renderChips(series) {
+      const all = aggregateKeywords(currentRows()).map((a)=>a.keyword);
+      const chips = state.selectedKeywords.map((kw, i) =>
+        `<span class="chip" style="--c:${COLORS[i % COLORS.length]}" data-kw="${kw}">${kw} ✕</span>`).join('');
+      document.getElementById('chips').innerHTML = chips;
+      document.querySelectorAll('.chip').forEach((c) => c.onclick = () => {
+        state.selectedKeywords = state.selectedKeywords.filter((k)=>k!==c.dataset.kw);
+        renderTrend();
+      });
+    }
+
+    window.__renderTrend = renderTrend;
+    window.__renderChartToolbar = renderChartToolbar;
+
     function renderAll() {
       renderKPIs();
-      // renderFilters / renderTrend / renderTable 는 이후 태스크에서 채움
+      // renderFilters / renderTable 는 이후 태스크에서 채움
       if (window.__renderFilters) window.__renderFilters();
-      if (window.__renderTrend) window.__renderTrend();
+      renderChartToolbar();
+      autoSelectTop();
+      renderTrend();
       if (window.__renderTable) window.__renderTable();
     }
 
