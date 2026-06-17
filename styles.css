@@ -1,0 +1,9 @@
+:root { --bg:#f7f8fa; --card:#fff; --line:#e8ebf0; --text:#1a2233; --muted:#9aa3b2; --accent:#3b5bdb; --good:#16a34a; --bad:#dc2626; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,'Segoe UI','Malgun Gothic',sans-serif; }
+.kpis { display:flex; gap:12px; padding:16px; flex-wrap:wrap; }
+.kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px; min-width:120px; box-shadow:0 1px 3px rgba(16,24,40,.06); }
+.kpi-label { font-size:12px; color:var(--muted); }
+.kpi-val { font-size:22px; font-weight:800; }
+.kpi.accent .kpi-val { color:var(--accent); }
+.status { padding:16px; color:var(--bad); }
