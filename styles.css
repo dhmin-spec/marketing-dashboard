@@ -6,6 +6,10 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,
 .kpi-label { font-size:12px; color:var(--muted); }
 .kpi-val { font-size:22px; font-weight:800; }
 .kpi.accent .kpi-val { color:var(--accent); }
+.kpi-delta { font-size:12px; font-weight:600; margin-top:4px; }
+.kpi-delta.good { color:var(--good); }
+.kpi-delta.bad { color:var(--bad); }
+.kpi-delta.neutral { color:var(--muted); }
 .status { padding:16px; color:var(--bad); }
 .card { background:var(--card); border:1px solid var(--line); border-radius:12px; margin:0 16px 16px; padding:14px; box-shadow:0 1px 3px rgba(16,24,40,.06); }
 .chart-toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }

@@ -77,26 +77,63 @@
 
     function currentRows() { return filterRows(state.rows, state.filters); }
 
+    function kpiTotals(rows) {
+      const a = { impression:0, click:0, cost:0, conclusion:0, revenue:0 };
+      for (const r of rows) { a.impression+=r.impression; a.click+=r.click; a.cost+=r.cost; a.conclusion+=r.conclusion; a.revenue+=r.revenue; }
+      return {
+        roas: a.cost>0 ? a.revenue/a.cost : null,
+        cvr: a.click>0 ? a.conclusion/a.click : null,
+        ctr: a.impression>0 ? a.click/a.impression : null,
+        cpa: a.conclusion>0 ? a.cost/a.conclusion : null,
+        cost: a.cost,
+        revenue: a.revenue,
+      };
+    }
+
+    function shiftDate(iso, days) {
+      const [y,m,d] = iso.split('-').map(Number);
+      const dt = new Date(y, m-1, d + days);
+      const p = (n)=>String(n).padStart(2,'0');
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
+    }
+
+    function priorPeriod(from, to) {
+      if (!from || !to) return null;
+      const ms = (s)=>{ const [y,m,d]=s.split('-').map(Number); return Date.UTC(y,m-1,d); };
+      const lenDays = Math.round((ms(to)-ms(from))/86400000) + 1;
+      const priorTo = shiftDate(from, -1);
+      const priorFrom = shiftDate(priorTo, -(lenDays-1));
+      return { from: priorFrom, to: priorTo, media: state.filters.media, device: state.filters.device };
+    }
+
+    function deltaHtml(key, cur, prior) {
+      if (cur == null || prior == null || prior === 0) return '<div class="kpi-delta neutral">–</div>';
+      const change = (cur - prior) / prior;
+      if (!isFinite(change)) return '<div class="kpi-delta neutral">–</div>';
+      if (change === 0) return '<div class="kpi-delta neutral">– 0.0%</div>';
+      const up = change > 0;
+      const lowerBetter = (key === 'cpa' || key === 'cost');
+      const good = lowerBetter ? !up : up;
+      const arrow = up ? '▲' : '▼';
+      return `<div class="kpi-delta ${good?'good':'bad'}">${arrow} ${Math.abs(change*100).toFixed(1)}%</div>`;
+    }
+
     function renderKPIs() {
-      const rows = currentRows();
-      const acc = { impression:0, click:0, cost:0, conclusion:0, revenue:0 };
-      for (const r of rows) { acc.impression+=r.impression; acc.click+=r.click; acc.cost+=r.cost; acc.conclusion+=r.conclusion; acc.revenue+=r.revenue; }
+      const cur = kpiTotals(currentRows());
+      const pp = priorPeriod(state.filters.from, state.filters.to);
+      const prior = pp ? kpiTotals(filterRows(state.rows, pp)) : null;
       const pct = (v) => v == null ? '-' : (v*100).toFixed(1) + '%';
       const won = (v) => '₩' + Math.round(v).toLocaleString('ko-KR');
-      const roas = acc.cost > 0 ? acc.revenue/acc.cost : null;
-      const cvr = acc.click > 0 ? acc.conclusion/acc.click : null;
-      const ctr = acc.impression > 0 ? acc.click/acc.impression : null;
-      const cpa = acc.conclusion > 0 ? acc.cost/acc.conclusion : null;
       const cards = [
-        ['ROAS', roas == null ? '-' : (roas*100).toFixed(0)+'%', 'accent'],
-        ['CVR', pct(cvr), ''],
-        ['CTR', pct(ctr), ''],
-        ['CPA', cpa == null ? '-' : won(cpa), ''],
-        ['비용', won(acc.cost), ''],
-        ['매출', won(acc.revenue), ''],
+        ['ROAS', cur.roas==null?'-':(cur.roas*100).toFixed(0)+'%', 'accent', 'roas'],
+        ['CVR', pct(cur.cvr), '', 'cvr'],
+        ['CTR', pct(cur.ctr), '', 'ctr'],
+        ['CPA', cur.cpa==null?'-':won(cur.cpa), '', 'cpa'],
+        ['비용', won(cur.cost), '', 'cost'],
+        ['매출', won(cur.revenue), '', 'revenue'],
       ];
-      document.getElementById('kpis').innerHTML = cards.map(([label,val,cls]) =>
-        `<div class="kpi ${cls}"><div class="kpi-label">${label}</div><div class="kpi-val">${val}</div></div>`
+      document.getElementById('kpis').innerHTML = cards.map(([label,val,cls,key]) =>
+        `<div class="kpi ${cls}"><div class="kpi-label">${label}</div><div class="kpi-val">${val}</div>${prior ? deltaHtml(key, cur[key], prior[key]) : ''}</div>`
       ).join('');
     }
 
