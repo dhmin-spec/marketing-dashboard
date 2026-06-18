@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>키워드 효율 추이 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>키워드 효율 추이</h1>
+    <div class="filters" id="filters"></div>
+  </header>
+  <section class="kpis" id="kpis"></section>
+  <section class="card chart-card">
+    <div class="chart-toolbar" id="chartToolbar"></div>
+    <div id="trendChart" style="height:380px;"></div>
+    <div class="chips" id="chips"></div>
+  </section>
+  <section class="card table-card">
+    <div class="table-toolbar"><input id="search" placeholder="키워드 검색..." /></div>
+    <div id="tableWrap"></div>
+  </section>
+  <div id="status" class="status" hidden></div>
+
+  <script type="module">
+    import { parseRows, filterRows, aggregateKeywords, topNKeywords, buildTrendSeries }
+      from './lib/metrics.js';
+
+    // === 설정: 시트 → 파일 → 공유 → 웹에 게시 → CSV 링크를 여기에 ===
+    const CSV_URL = 'PASTE_PUBLISHED_CSV_URL_HERE';
+
+    const state = {
+      rows: [],
+      filters: { from: '', to: '', media: 'ALL', device: 'ALL' },
+      metric: 'cvr',
+      rankBy: 'conclusion',
+      selectedKeywords: [],
+      sortKey: 'conclusion',
+      sortDir: 'desc',
+      search: '',
+    };
+    window.__state = state; // 디버깅용
+
+    function showStatus(msg, retry = false) {
+      const el = document.getElementById('status');
+      el.hidden = false;
+      el.innerHTML = msg + (retry ? ' <button id="retry">다시 시도</button>' : '');
+      if (retry) document.getElementById('retry').onclick = loadData;
+    }
+    function hideStatus() { document.getElementById('status').hidden = true; }
+
+    async function loadData() {
+      hideStatus();
+      if (CSV_URL.startsWith('PASTE_')) { showStatus('CSV_URL을 설정하세요 (dashboard.html 상단).'); return; }
+      try {
+        const res = await fetch(CSV_URL);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const text = await res.text();
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        state.rows = parseRows(parsed.data);
+        if (state.rows.length === 0) { showStatus('데이터가 비어 있습니다.'); return; }
+        initFiltersDefault();
+        renderAll();
+      } catch (e) {
+        showStatus('데이터를 불러오지 못했습니다: ' + e.message, true);
+      }
+    }
+
+    function initFiltersDefault() {
+      const dates = state.rows.map((r) => r.date).filter(Boolean).sort();
+      state.filters.from = dates[0] || '';
+      state.filters.to = dates[dates.length - 1] || '';
+    }
+
+    function currentRows() { return filterRows(state.rows, state.filters); }
+
+    function kpiTotals(rows) {
+      const a = { impression:0, click:0, cost:0, conclusion:0, revenue:0 };
+      for (const r of rows) { a.impression+=r.impression; a.click+=r.click; a.cost+=r.cost; a.conclusion+=r.conclusion; a.revenue+=r.revenue; }
+      return {
+        roas: a.cost>0 ? a.revenue/a.cost : null,
+        cvr: a.click>0 ? a.conclusion/a.click : null,
+        ctr: a.impression>0 ? a.click/a.impression : null,
+        cpa: a.conclusion>0 ? a.cost/a.conclusion : null,
+        cost: a.cost,
+        revenue: a.revenue,
+      };
+    }
+
+    function shiftDate(iso, days) {
+      const [y,m,d] = iso.split('-').map(Number);
+      const dt = new Date(y, m-1, d + days);
+      const p = (n)=>String(n).padStart(2,'0');
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
+    }
+
+    function priorPeriod(from, to) {
+      if (!from || !to) return null;
+      const ms = (s)=>{ const [y,m,d]=s.split('-').map(Number); return Date.UTC(y,m-1,d); };
+      const lenDays = Math.round((ms(to)-ms(from))/86400000) + 1;
+      const priorTo = shiftDate(from, -1);
+      const priorFrom = shiftDate(priorTo, -(lenDays-1));
+      return { from: priorFrom, to: priorTo, media: state.filters.media, device: state.filters.device };
+    }
+
+    function deltaHtml(key, cur, prior) {
+      if (cur == null || prior == null || prior === 0) return '<div class="kpi-delta neutral">–</div>';
+      const change = (cur - prior) / prior;
+      if (!isFinite(change)) return '<div class="kpi-delta neutral">–</div>';
+      if (change === 0) return '<div class="kpi-delta neutral">– 0.0%</div>';
+      const up = change > 0;
+      const lowerBetter = (key === 'cpa' || key === 'cost');
+      const good = lowerBetter ? !up : up;
+      const arrow = up ? '▲' : '▼';
+      return `<div class="kpi-delta ${good?'good':'bad'}">${arrow} ${Math.abs(change*100).toFixed(1)}%</div>`;
+    }
+
+    function renderKPIs() {
+      const cur = kpiTotals(currentRows());
+      const pp = priorPeriod(state.filters.from, state.filters.to);
+      const prior = pp ? kpiTotals(filterRows(state.rows, pp)) : null;
+      const pct = (v) => v == null ? '-' : (v*100).toFixed(1) + '%';
+      const won = (v) => '₩' + Math.round(v).toLocaleString('ko-KR');
+      const cards = [
+        ['ROAS', cur.roas==null?'-':(cur.roas*100).toFixed(0)+'%', 'accent', 'roas'],
+        ['CVR', pct(cur.cvr), '', 'cvr'],
+        ['CTR', pct(cur.ctr), '', 'ctr'],
+        ['CPA', cur.cpa==null?'-':won(cur.cpa), '', 'cpa'],
+        ['비용', won(cur.cost), '', 'cost'],
+        ['매출', won(cur.revenue), '', 'revenue'],
+      ];
+      document.getElementById('kpis').innerHTML = cards.map(([label,val,cls,key]) =>
+        `<div class="kpi ${cls}"><div class="kpi-label">${label}</div><div class="kpi-val">${val}</div>${prior ? deltaHtml(key, cur[key], prior[key]) : ''}</div>`
+      ).join('');
+    }
+
+    let chart;
+    const METRICS = [['cvr','CVR'],['ctr','CTR'],['cpa','CPA'],['roas','ROAS']];
+    const RANKS = [['conclusion','전환수'],['cost','비용'],['revenue','매출'],['click','클릭']];
+    const COLORS = ['#3b5bdb','#16a34a','#dc2626','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d'];
+
+    function renderChartToolbar() {
+      const m = METRICS.map(([k,l]) => `<button class="seg ${state.metric===k?'on':''}" data-metric="${k}">${l}</button>`).join('');
+      const r = RANKS.map(([k,l]) => `<option value="${k}" ${state.rankBy===k?'selected':''}>${l} 상위</option>`).join('');
+      document.getElementById('chartToolbar').innerHTML =
+        `<div class="segs">${m}</div><select id="rankSel">${r}</select>`;
+      document.querySelectorAll('.seg').forEach((b) => b.onclick = () => { state.metric = b.dataset.metric; renderTrend(); renderChartToolbar(); });
+      document.getElementById('rankSel').onchange = (e) => { state.rankBy = e.target.value; autoSelectTop(); renderTrend(); };
+    }
+
+    function autoSelectTop() {
+      const agg = aggregateKeywords(currentRows());
+      state.selectedKeywords = topNKeywords(agg, state.rankBy, 5);
+    }
+
+    function renderTrend() {
+      if (!chart) chart = echarts.init(document.getElementById('trendChart'));
+      const rows = currentRows();
+      if (state.selectedKeywords.length === 0) autoSelectTop();
+      const { dates, series } = buildTrendSeries(rows, state.selectedKeywords, state.metric);
+      const isPct = state.metric === 'cvr' || state.metric === 'ctr';
+      chart.setOption({
+        color: COLORS,
+        tooltip: { trigger:'axis', valueFormatter:(v)=> v==null?'-':(isPct?(v*100).toFixed(1)+'%':Math.round(v).toLocaleString()) },
+        legend: { show:false },
+        grid: { left:48, right:16, top:16, bottom:32 },
+        xAxis: { type:'category', data:dates },
+        yAxis: { type:'value', axisLabel:{ formatter:(v)=> isPct?(v*100).toFixed(0)+'%':v } },
+        series: series.map((s) => ({ name:s.keyword, type:'line', data:s.data, connectNulls:true, smooth:true, symbolSize:6 })),
+      }, true);
+      renderChips(series);
+    }
+
+    function renderChips(series) {
+      const chips = state.selectedKeywords.map((kw, i) =>
+        `<span class="chip" style="--c:${COLORS[i % COLORS.length]}" data-kw="${kw}">${kw} ✕</span>`).join('');
+      document.getElementById('chips').innerHTML = chips;
+      document.querySelectorAll('.chip').forEach((c) => c.onclick = () => {
+        state.selectedKeywords = state.selectedKeywords.filter((k)=>k!==c.dataset.kw);
+        renderTrend();
+      });
+    }
+
+    window.__renderTrend = renderTrend;
+    window.__renderChartToolbar = renderChartToolbar;
+
+    const COLS = [
+      ['keyword','키워드','text'],['impression','노출','int'],['click','클릭','int'],
+      ['ctr','CTR','pct'],['cost','비용','won'],['cpc','CPC','won'],
+      ['conclusion','전환','int'],['cvr','CVR','pct'],['cpa','CPA','won'],
+      ['revenue','매출','won'],['roas','ROAS','roas'],
+    ];
+    const fmt = {
+      text:(v)=>v, int:(v)=>Math.round(v).toLocaleString('ko-KR'),
+      pct:(v)=>v==null?'-':(v*100).toFixed(1)+'%',
+      won:(v)=>v==null?'-':'₩'+Math.round(v).toLocaleString('ko-KR'),
+      roas:(v)=>v==null?'-':(v*100).toFixed(0)+'%',
+    };
+
+    function renderTable() {
+      let agg = aggregateKeywords(currentRows());
+      if (state.search) agg = agg.filter((a)=>a.keyword.includes(state.search));
+      agg.sort((a,b)=>{
+        const av=a[state.sortKey], bv=b[state.sortKey];
+        const an=av==null?-Infinity:av, bn=bv==null?-Infinity:bv;
+        if (typeof av==='string') return state.sortDir==='asc'?String(av).localeCompare(bv):String(bv).localeCompare(av);
+        return state.sortDir==='asc'?an-bn:bn-an;
+      });
+      agg = agg.slice(0, 200);
+      const head = COLS.map(([k,l])=>`<th data-key="${k}" class="${state.sortKey===k?'sorted '+state.sortDir:''}">${l}</th>`).join('');
+      const body = agg.map((a)=>{
+        const sel = state.selectedKeywords.includes(a.keyword) ? 'sel' : '';
+        const tds = COLS.map(([k,,t])=>`<td class="${t==='text'?'l':'r'}">${fmt[t](a[k])}</td>`).join('');
+        return `<tr class="${sel}" data-kw="${a.keyword}">${tds}</tr>`;
+      }).join('');
+      document.getElementById('tableWrap').innerHTML = `<table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+      document.querySelectorAll('.grid th').forEach((th)=>th.onclick=()=>{
+        const k=th.dataset.key;
+        if (state.sortKey===k) state.sortDir = state.sortDir==='asc'?'desc':'asc';
+        else { state.sortKey=k; state.sortDir = k==='keyword'?'asc':'desc'; }
+        renderTable();
+      });
+      document.querySelectorAll('.grid tbody tr').forEach((tr)=>tr.onclick=()=>{
+        const kw=tr.dataset.kw;
+        if (state.selectedKeywords.includes(kw)) state.selectedKeywords = state.selectedKeywords.filter((k)=>k!==kw);
+        else state.selectedKeywords = [...state.selectedKeywords, kw];
+        renderTrend(); renderTable();
+      });
+    }
+    window.__renderTable = renderTable;
+
+    function uniqueVals(field) { return [...new Set(state.rows.map((r)=>r[field]).filter(Boolean))].sort(); }
+
+    function renderFilters() {
+      const media = uniqueVals('media').map((v)=>`<option value="${v}" ${state.filters.media===v?'selected':''}>${v}</option>`).join('');
+      const device = uniqueVals('device').map((v)=>`<option value="${v}" ${state.filters.device===v?'selected':''}>${v}</option>`).join('');
+      document.getElementById('filters').innerHTML = `
+        <label>기간 <input type="date" id="fFrom" value="${state.filters.from}"></label>
+        <span>~</span>
+        <label><input type="date" id="fTo" value="${state.filters.to}"></label>
+        <label>매체 <select id="fMedia"><option value="ALL">전체</option>${media}</select></label>
+        <label>디바이스 <select id="fDevice"><option value="ALL">전체</option>${device}</select></label>`;
+      document.getElementById('fFrom').onchange=(e)=>{ state.filters.from=e.target.value; onFilterChange(); };
+      document.getElementById('fTo').onchange=(e)=>{ state.filters.to=e.target.value; onFilterChange(); };
+      document.getElementById('fMedia').onchange=(e)=>{ state.filters.media=e.target.value; onFilterChange(); };
+      document.getElementById('fDevice').onchange=(e)=>{ state.filters.device=e.target.value; onFilterChange(); };
+    }
+
+    function onFilterChange() {
+      if (currentRows().length === 0) { showStatus('해당 조건에 데이터가 없습니다.'); }
+      else { hideStatus(); }
+      autoSelectTop();
+      renderKPIs(); renderTrend(); renderTable();
+    }
+    window.__renderFilters = renderFilters;
+
+    function renderAll() {
+      renderFilters();
+      renderKPIs();
+      renderChartToolbar();
+      autoSelectTop();
+      renderTrend();
+      renderTable();
+      const search = document.getElementById('search');
+      if (search && !search.__bound) { search.__bound = true; search.oninput = (e)=>{ state.search = e.target.value.trim(); renderTable(); }; }
+    }
+
+    window.__loadData = loadData;
+    window.__renderAll = renderAll;
+    window.__currentRows = currentRows;
+    loadData();
+  </script>
+</body>
+</html>

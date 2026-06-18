@@ -1,0 +1,5 @@
+Date,Media,Device,Media_CPC,Part,campaign,adgroup,keyword,Product,impression,click,cost,sum_rank,connection,input,complete,conclusion,sales,매출
+2025-10-31,Google,PC,구글_CPC,일반,캠A,그룹A,여행자보험.,G.해외여행,496,64,220475.4108,0,106,40,38,13,"336,481",336481
+2025-11-01,Google,PC,구글_CPC,일반,캠A,그룹A,여행자보험.,G.해외여행,376,44,148972.8414,0,85,32,30,10,"258,832",258832
+2025-10-31,Google,Mobile,구글_CPC,일반,캠A,그룹A,KB여행자보험,G.해외여행,21,1,3670.139,0,3,1,0,0,-,0
+2025-11-01,Naver,PC,네이버_CPC,일반,캠B,그룹B,유럽여행자보험,G.해외여행,4,2,6095.716,0,2,1,1,0,-,0
