@@ -2,3 +2,20 @@ node_modules/
 .superpowers/
 .playwright-mcp/
 *.output
+
+# secrets / local config
+.env
+.claude/.env
+.claude/google/
+dashboard-demo.html
+.venv/
+
+# 임시/작업 산출물 (배포에 불필요)
+__pycache__/
+_extract_tmp/
+output/
+naver_raw.html
+naver_probe.py
+gen_cat.py
+*.zip
+data/processed/
