@@ -36,9 +36,13 @@ def read_copies(data: bytes) -> list[Copy]:
         text = ws.cell(r, COL_COPY).value
         if no is None or text is None:
             continue
+        try:
+            no_int = int(no)
+        except (ValueError, TypeError):
+            continue
         mx = ws.cell(r, COL_MAX).value
         copies.append(Copy(
-            no=int(no),
+            no=no_int,
             text=str(text),
             position=str(ws.cell(r, COL_POS).value or ""),
             max_len=int(mx) if isinstance(mx, (int, float)) else None,

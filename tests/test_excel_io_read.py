@@ -17,3 +17,35 @@ def test_read_copies_missing_sheet_raises():
     buf = io.BytesIO(); wb.save(buf)
     with pytest.raises(SheetNotFoundError):
         read_copies(buf.getvalue())
+
+
+def test_read_copies_skips_non_numeric_no_row():
+    import io, openpyxl
+    from shim.excel_io import SHEET_TND, DATA_START, COL_NO, COL_COPY, COL_POS, COL_MAX
+
+    wb = openpyxl.Workbook()
+    wb.active.title = "드롭다운 수식"
+    t = wb.create_sheet(SHEET_TND)
+    t["B4"], t["C4"], t["D4"] = "보종", "NO", "문구 및 이미지"
+    t["E4"], t["F4"], t["H4"] = "글자수", "광고위치", "비고"
+
+    r = DATA_START
+    t.cell(r, 2, "전 보종")
+    t.cell(r, COL_NO, 1)
+    t.cell(r, COL_COPY, "정상 문구")
+    t.cell(r, COL_POS, "설명문구")
+    t.cell(r, COL_MAX, 45)
+
+    r2 = DATA_START + 1
+    t.cell(r2, 2, "전 보종")
+    t.cell(r2, COL_NO, "참고")
+    t.cell(r2, COL_COPY, "비고 텍스트")
+    t.cell(r2, COL_POS, "설명문구")
+    t.cell(r2, COL_MAX, 45)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    copies = read_copies(buf.getvalue())
+    assert len(copies) == 1
+    assert copies[0].no == 1
