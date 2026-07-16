@@ -53,6 +53,8 @@ def read_copies(data: bytes) -> list[Copy]:
 
 def build_revised_workbook(data: bytes, revisions: dict[int, str]) -> bytes:
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=False)
+    if SHEET_TND not in wb.sheetnames:
+        raise SheetNotFoundError(f"시트 '{SHEET_TND}' 없음. 있는 시트: {wb.sheetnames}")
     ws = wb[SHEET_TND]
 
     order: list[int] = []  # T&D 데이터 순서대로의 NO 목록
@@ -69,7 +71,7 @@ def build_revised_workbook(data: bytes, revisions: dict[int, str]) -> bytes:
     if SHEET_UPLOAD in wb.sheetnames:
         us = wb[SHEET_UPLOAD]
         for idx, no in enumerate(order):
-            if no in revisions:
+            if no in revisions and idx + 1 <= us.max_row:
                 us.cell(idx + 1, 3).value = revisions[no]  # C열
 
     buf = io.BytesIO()

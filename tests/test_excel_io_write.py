@@ -1,6 +1,7 @@
 import io
 import openpyxl
-from shim.excel_io import build_revised_workbook, read_copies
+import pytest
+from shim.excel_io import build_revised_workbook, read_copies, SheetNotFoundError
 
 
 def _load(data, keep_formulas=True):
@@ -33,3 +34,59 @@ def test_other_sheet_untouched(sample_workbook_bytes):
     d = _load(out)["드롭다운 수식"]
     assert d["B1"].value == "삼성화재"
     assert d["C1"].value == "=B1"
+
+
+def test_missing_tnd_sheet_raises():
+    wb = openpyxl.Workbook()
+    wb.active.title = "드롭다운 수식"
+    buf = io.BytesIO()
+    wb.save(buf)
+    data = buf.getvalue()
+
+    with pytest.raises(SheetNotFoundError):
+        build_revised_workbook(data, {1: "x"})
+
+
+def test_upload_row_out_of_range_skipped():
+    SHEET_TND = "검색광고 T&D"
+    SHEET_UPLOAD = "업로드용"
+
+    wb = openpyxl.Workbook()
+    d = wb.active
+    d.title = "드롭다운 수식"
+
+    t = wb.create_sheet(SHEET_TND)
+    t["B4"], t["C4"], t["D4"] = "보종", "NO", "문구 및 이미지"
+    t["E4"], t["F4"], t["H4"] = "글자수", "광고위치", "비고"
+    rows = [
+        (1, "판매 수수료가 없어 저렴한 삼성화재 다이렉트", "설명문구", 45),
+        (2, "AI맞춤보장", "추가제목", 15),
+    ]
+    for i, (no, text, pos, mx) in enumerate(rows):
+        r = 5 + i
+        t.cell(r, 2, "전 보종")
+        t.cell(r, 3, no)
+        t.cell(r, 4, text)
+        t.cell(r, 5, f"=LEN(D{r})")
+        t.cell(r, 6, pos)
+        t.cell(r, 8, mx)
+
+    # 업로드용에는 NO 1 한 행만 존재
+    u = wb.create_sheet(SHEET_UPLOAD)
+    u.cell(1, 1, "전 보종")
+    u.cell(1, 2, ">")
+    u.cell(1, 3, rows[0][1])
+    u.cell(1, 4, "=A1&B1&C1")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    data = buf.getvalue()
+
+    out = build_revised_workbook(data, {2: "수정됨"})
+
+    wb_out = _load(out)
+    t_out = wb_out[SHEET_TND]
+    assert t_out["D6"].value == "수정됨"  # NO 2, row 6, T&D는 정상 반영
+
+    u_out = wb_out[SHEET_UPLOAD]
+    assert u_out.max_row == 1  # phantom row 생성되지 않음
