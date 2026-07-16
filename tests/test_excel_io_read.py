@@ -1,5 +1,18 @@
 import pytest
-from shim.excel_io import read_copies, SheetNotFoundError, Copy
+from shim.excel_io import read_copies, SheetNotFoundError, Copy, _resolve_int
+
+
+def test_resolve_int_uses_cached_when_formula():
+    assert _resolve_int("=C5+1", 2) == 2      # 수식이면 캐시값 사용
+
+
+def test_resolve_int_plain_number():
+    assert _resolve_int(3, None) == 3          # 일반 숫자는 그대로
+
+
+def test_resolve_int_non_numeric_returns_none():
+    assert _resolve_int("참고", None) is None   # 비숫자→None
+    assert _resolve_int("=C5+1", None) is None  # 캐시 없으면 None
 
 
 def test_read_copies_extracts_rows(sample_workbook_bytes):
