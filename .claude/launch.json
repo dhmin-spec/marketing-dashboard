@@ -12,6 +12,12 @@
       "runtimeExecutable": ".venv/Scripts/streamlit.exe",
       "runtimeArgs": ["run", "mkt_dashboard.py", "--server.port", "8502", "--server.headless", "true"],
       "port": 8502
+    },
+    {
+      "name": "shim-bridge",
+      "runtimeExecutable": ".venv/Scripts/streamlit.exe",
+      "runtimeArgs": ["run", "shim_app.py", "--server.port", "8503", "--server.headless", "true"],
+      "port": 8503
     }
   ]
 }
