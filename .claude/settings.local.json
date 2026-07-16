@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/MADUP/Downloads/**)",
+      "Bash(unzip -l claude-config-pack-marketer-windows.zip)",
+      "Bash(rm -rf _ccpack_tmp)",
+      "Bash(mkdir _ccpack_tmp)",
+      "Bash(unzip -q claude-config-pack-marketer-windows.zip -d _ccpack_tmp)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\MADUP\\\\Downloads\\\\_ccpack_tmp\\\\claude-config-pack-marketer-windows\\\\install.ps1\")",
+      "Bash(xxd)",
+      "Read(//c/Users/MADUP/.claude/**)",
+      "Bash(python -c \"import json; json.load\\(open\\('settings.json'\\)\\); print\\('settings.json: valid JSON'\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('settings.json'\\)\\);console.log\\('settings.json: valid JSON'\\)\")",
+      "Bash(rm -rf /c/Users/MADUP/Downloads/_ccpack_tmp)"
+    ]
+  }
+}

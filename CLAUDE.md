@@ -39,6 +39,9 @@ streamlit run streamlit_app.py
 
 # 파이프라인 단독 실행(합본 생성) — 전처리 로직 수정 시 확인
 python mkt_pipeline.py data/raw
+
+# 심의 의견 자동 반영 도구
+.venv/Scripts/streamlit run shim_app.py --server.port 8503
 ```
 
 - Python 의존성: `requirements.txt` (streamlit, pandas). altair는 streamlit과 함께 설치됨. `.venv/` 사용.
