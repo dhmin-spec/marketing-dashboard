@@ -28,14 +28,50 @@ def _gate() -> bool:
     return False
 
 
-GEMINI_MODEL = "gemini-2.5-flash"  # 무료 구간 있음. 더 정교하게 하려면 "gemini-2.5-pro"
+def _resolve_model(client) -> str:
+    """계정에서 실제 쓸 수 있는 generateContent 모델을 골라 캐시한다.
+    특정 모델명 하드코딩으로 인한 404(폐기)를 피하기 위해 동적으로 선택.
+    GEMINI_MODEL 시크릿이 있으면 그것을 우선 사용."""
+    import re
+    try:
+        override = st.secrets["GEMINI_MODEL"]
+    except Exception:
+        override = None
+    if override:
+        return override
+    if "gemini_model" in st.session_state:
+        return st.session_state["gemini_model"]
+
+    names = []
+    for m in client.models.list():
+        acts = getattr(m, "supported_actions", None) or []
+        if "generateContent" in acts:
+            names.append(m.name.split("/")[-1])
+
+    def score(n: str) -> float:
+        nl, s = n.lower(), 0.0
+        if "flash" in nl:
+            s += 100            # flash = 저렴·무료 구간
+        elif "pro" in nl:
+            s += 40
+        if "preview" in nl or "exp" in nl:
+            s -= 10             # 안정 버전 우선
+        mm = re.search(r"(\d+(?:\.\d+)?)", nl)
+        if mm:
+            s += float(mm.group(1))
+        return s
+
+    chosen = max(names, key=score) if names else "gemini-flash-latest"
+    st.session_state["gemini_model"] = chosen
+    return chosen
 
 
 def _make_call_fn():
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+    model = _resolve_model(client)
 
     def call_fn(prompt: str) -> str:
-        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        resp = client.models.generate_content(model=model, contents=prompt)
         return resp.text or ""
 
     return call_fn
@@ -79,6 +115,8 @@ if st.button("AI 수정 실행", type="primary") and opinions.strip():
             st.error(f"AI 수정 실패: {e}. 잠시 후 [AI 수정 실행]을 다시 눌러주세요.")
             st.stop()
     st.session_state["revs"] = {r.no: r for r in revs}
+    if st.session_state.get("gemini_model"):
+        st.caption(f"사용 모델: {st.session_state['gemini_model']}")
     # 매칭 실패 탐지
     copy_nos = {c.no for c in copies}
     missing = referenced_numbers(opinions) - copy_nos
