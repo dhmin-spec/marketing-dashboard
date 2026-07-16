@@ -18,7 +18,7 @@ def test_resolve_int_non_numeric_returns_none():
 def test_read_copies_extracts_rows(sample_workbook_bytes):
     copies = read_copies(sample_workbook_bytes)
     assert len(copies) == 3
-    assert copies[0] == Copy(no=1, text="판매 수수료가 없어 저렴한 삼성화재 다이렉트",
+    assert copies[0] == Copy(no=1, text="판매 수수료가 없어 저렴한 가나다이렉트",
                              position="설명문구", max_len=45, row=5)
     assert copies[1].max_len == 15
     assert copies[2].no == 3

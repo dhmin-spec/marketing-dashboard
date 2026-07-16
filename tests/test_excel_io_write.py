@@ -12,7 +12,7 @@ def test_overwrites_only_targeted_copy(sample_workbook_bytes):
     out = build_revised_workbook(sample_workbook_bytes, {2: "AI맞춤보장보험"})
     wb = _load(out)
     t = wb["검색광고 T&D"]
-    assert t["D5"].value == "판매 수수료가 없어 저렴한 삼성화재 다이렉트"  # 미수정 유지
+    assert t["D5"].value == "판매 수수료가 없어 저렴한 가나다이렉트"  # 미수정 유지
     assert t["D6"].value == "AI맞춤보장보험"                              # 수정 반영
 
 
@@ -32,7 +32,7 @@ def test_upload_sheet_c_synced_d_formula_kept(sample_workbook_bytes):
 def test_other_sheet_untouched(sample_workbook_bytes):
     out = build_revised_workbook(sample_workbook_bytes, {2: "AI맞춤보장보험"})
     d = _load(out)["드롭다운 수식"]
-    assert d["B1"].value == "삼성화재"
+    assert d["B1"].value == "가나보험"
     assert d["C1"].value == "=B1"
 
 
@@ -59,7 +59,7 @@ def test_upload_row_out_of_range_skipped():
     t["B4"], t["C4"], t["D4"] = "보종", "NO", "문구 및 이미지"
     t["E4"], t["F4"], t["H4"] = "글자수", "광고위치", "비고"
     rows = [
-        (1, "판매 수수료가 없어 저렴한 삼성화재 다이렉트", "설명문구", 45),
+        (1, "판매 수수료가 없어 저렴한 가나다이렉트", "설명문구", 45),
         (2, "AI맞춤보장", "추가제목", 15),
     ]
     for i, (no, text, pos, mx) in enumerate(rows):

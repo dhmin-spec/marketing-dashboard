@@ -54,7 +54,7 @@ def _build() -> bytes:
     # sheet 1: 드롭다운 수식 (반드시 무변경으로 남아야 함)
     d = wb.active
     d.title = "드롭다운 수식"
-    d["B1"] = "삼성화재"
+    d["B1"] = "가나보험"
     d["C1"] = "=B1"  # 수식 보존 확인용
 
     # sheet 2: 검색광고 T&D
@@ -62,7 +62,7 @@ def _build() -> bytes:
     t["B4"], t["C4"], t["D4"] = "보종", "NO", "문구 및 이미지"
     t["E4"], t["F4"], t["H4"] = "글자수", "광고위치", "비고"
     rows = [
-        (1, "판매 수수료가 없어 저렴한 삼성화재 다이렉트", "설명문구", 45),
+        (1, "판매 수수료가 없어 저렴한 가나다이렉트", "설명문구", 45),
         (2, "AI맞춤보장", "추가제목", 15),
         (3, "보험료확인", "서브링크", 6),
     ]
@@ -108,7 +108,7 @@ def test_fixture_has_expected_structure():
     assert wb.sheetnames == ["드롭다운 수식", "검색광고 T&D", "업로드용"]
     t = wb["검색광고 T&D"]
     assert t["C4"].value == "NO"
-    assert t["D5"].value == "판매 수수료가 없어 저렴한 삼성화재 다이렉트"
+    assert t["D5"].value == "판매 수수료가 없어 저렴한 가나다이렉트"
     assert t["H6"].value == 15
 ```
 
@@ -153,7 +153,7 @@ from shim.excel_io import read_copies, SheetNotFoundError, Copy
 def test_read_copies_extracts_rows(sample_workbook_bytes):
     copies = read_copies(sample_workbook_bytes)
     assert len(copies) == 3
-    assert copies[0] == Copy(no=1, text="판매 수수료가 없어 저렴한 삼성화재 다이렉트",
+    assert copies[0] == Copy(no=1, text="판매 수수료가 없어 저렴한 가나다이렉트",
                              position="설명문구", max_len=45, row=5)
     assert copies[1].max_len == 15
     assert copies[2].no == 3
@@ -271,7 +271,7 @@ def test_overwrites_only_targeted_copy(sample_workbook_bytes):
     out = build_revised_workbook(sample_workbook_bytes, {2: "AI맞춤보장보험"})
     wb = _load(out)
     t = wb["검색광고 T&D"]
-    assert t["D5"].value == "판매 수수료가 없어 저렴한 삼성화재 다이렉트"  # 미수정 유지
+    assert t["D5"].value == "판매 수수료가 없어 저렴한 가나다이렉트"  # 미수정 유지
     assert t["D6"].value == "AI맞춤보장보험"                              # 수정 반영
 
 
@@ -291,7 +291,7 @@ def test_upload_sheet_c_synced_d_formula_kept(sample_workbook_bytes):
 def test_other_sheet_untouched(sample_workbook_bytes):
     out = build_revised_workbook(sample_workbook_bytes, {2: "AI맞춤보장보험"})
     d = _load(out)["드롭다운 수식"]
-    assert d["B1"].value == "삼성화재"
+    assert d["B1"].value == "가나보험"
     assert d["C1"].value == "=B1"
 ```
 
@@ -724,7 +724,7 @@ git commit -m "feat: 심의 의견 반영 Streamlit 앱"
 
 Run:
 ```bash
-python -c "from shim.excel_io import read_copies; import pathlib; p=pathlib.Path(r'C:\Users\MADUP\주식회사매드업 Dropbox\광고사업부\4. 광고주\삼성화재SA\5. 심의\1. 심의안\26년 7월\260708 발송\[사내심의]다이렉트장기_장기_네이버_T&D(12건)_판매수수료_260708.xlsx'); print(len(read_copies(p.read_bytes())), '건')"
+python -c "from shim.excel_io import read_copies; import pathlib; p=pathlib.Path(r'<로컬 심의안 파일 경로>.xlsx'); print(len(read_copies(p.read_bytes())), '건')"
 ```
 Expected: `12 건`
 
@@ -732,7 +732,7 @@ Expected: `12 건`
 
 Run:
 ```bash
-python -c "from shim.excel_io import read_copies, build_revised_workbook; import pathlib,io,openpyxl; p=pathlib.Path(r'C:\Users\MADUP\주식회사매드업 Dropbox\광고사업부\4. 광고주\삼성화재SA\5. 심의\1. 심의안\26년 7월\260708 발송\[사내심의]다이렉트장기_장기_네이버_T&D(12건)_판매수수료_260708.xlsx'); raw=p.read_bytes(); out=build_revised_workbook(raw, {3:'테스트수정문안'}); wb=openpyxl.load_workbook(io.BytesIO(out)); print('T&D D7:', wb['검색광고 T&D']['D7'].value); print('업로드용 C3:', wb['업로드용']['C3'].value)"
+python -c "from shim.excel_io import read_copies, build_revised_workbook; import pathlib,io,openpyxl; p=pathlib.Path(r'<로컬 심의안 파일 경로>.xlsx'); raw=p.read_bytes(); out=build_revised_workbook(raw, {3:'테스트수정문안'}); wb=openpyxl.load_workbook(io.BytesIO(out)); print('T&D D7:', wb['검색광고 T&D']['D7'].value); print('업로드용 C3:', wb['업로드용']['C3'].value)"
 ```
 Expected: `T&D D7: 테스트수정문안` / `업로드용 C3: 테스트수정문안`
 
