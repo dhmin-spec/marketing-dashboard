@@ -49,3 +49,29 @@ def read_copies(data: bytes) -> list[Copy]:
             row=r,
         ))
     return copies
+
+
+def build_revised_workbook(data: bytes, revisions: dict[int, str]) -> bytes:
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=False)
+    ws = wb[SHEET_TND]
+
+    order: list[int] = []  # T&D 데이터 순서대로의 NO 목록
+    for r in range(DATA_START, ws.max_row + 1):
+        no = ws.cell(r, COL_NO).value
+        text = ws.cell(r, COL_COPY).value
+        if no is None or text is None:
+            continue
+        no = int(no)
+        order.append(no)
+        if no in revisions:
+            ws.cell(r, COL_COPY).value = revisions[no]
+
+    if SHEET_UPLOAD in wb.sheetnames:
+        us = wb[SHEET_UPLOAD]
+        for idx, no in enumerate(order):
+            if no in revisions:
+                us.cell(idx + 1, 3).value = revisions[no]  # C열
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
