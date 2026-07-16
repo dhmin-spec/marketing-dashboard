@@ -1,5 +1,4 @@
 # shim_app.py
-import io
 import datetime as dt
 import pandas as pd
 import streamlit as st
@@ -33,7 +32,7 @@ def _make_call_fn():
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
-        return resp.content[0].text
+        return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
 
     return call_fn
 
@@ -69,7 +68,6 @@ if st.button("AI 수정 실행", type="primary") and opinions.strip():
         revs = revise(copies, opinions, _make_call_fn())
     st.session_state["revs"] = {r.no: r for r in revs}
     # 매칭 실패 탐지
-    revised_nos = {r.no for r in revs}
     missing = referenced_numbers(opinions) - {c.no for c in copies}
     if missing:
         st.warning(f"의견이 참조했지만 표에 없는 번호: {sorted(missing)}")
@@ -93,7 +91,7 @@ if "revs" in st.session_state:
     if len(over):
         st.error(f"제한 초과 문안 {len(over)}건 — 수정문을 줄여주세요: 번호 {list(over['번호'])}")
 
-    if st.button("엑셀 다운로드 생성"):
+    if st.button("엑셀 다운로드 생성", disabled=len(over) > 0):
         revisions = {int(row["번호"]): row["수정문"] for _, row in edited.iterrows()}
         out = build_revised_workbook(raw, revisions)
         name = up.name.rsplit(".", 1)[0]
