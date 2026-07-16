@@ -9,6 +9,7 @@ node_modules/
 .claude/google/
 dashboard-demo.html
 .venv/
+.streamlit/secrets.toml
 
 # 임시/작업 산출물 (배포에 불필요)
 __pycache__/
