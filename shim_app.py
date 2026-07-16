@@ -1,8 +1,8 @@
-# shim_app.py
+# shim_app.py — 심의 의견 반영 (Google Gemini API 자동 버전)
 import datetime as dt
 import pandas as pd
 import streamlit as st
-import anthropic
+from google import genai
 
 from shim.excel_io import read_copies, build_revised_workbook, SheetNotFoundError
 from shim.opinions import referenced_numbers
@@ -28,16 +28,15 @@ def _gate() -> bool:
     return False
 
 
+GEMINI_MODEL = "gemini-2.5-flash"  # 무료 구간 있음. 더 정교하게 하려면 "gemini-2.5-pro"
+
+
 def _make_call_fn():
-    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
 
     def call_fn(prompt: str) -> str:
-        resp = client.messages.create(
-            model="claude-opus-4-8",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        return resp.text or ""
 
     return call_fn
 
@@ -73,7 +72,7 @@ opinions = st.text_area("심의 의견 붙여넣기", height=200,
                         placeholder="2번 문안: '원문' -> 수정 지시 / 6번 문안: ...")
 
 if st.button("AI 수정 실행", type="primary") and opinions.strip():
-    with st.spinner("Claude가 문안을 수정 중..."):
+    with st.spinner("Gemini가 문안을 수정 중..."):
         try:
             revs = revise(copies, opinions, _make_call_fn())
         except Exception as e:
