@@ -48,6 +48,10 @@ if not up:
     st.stop()
 
 raw = up.getvalue()
+file_id = (up.name, len(raw))
+if st.session_state.get("file_id") != file_id:
+    st.session_state["file_id"] = file_id
+    st.session_state.pop("revs", None)
 try:
     copies = read_copies(raw)
 except SheetNotFoundError as e:
@@ -65,12 +69,20 @@ opinions = st.text_area("심의 의견 붙여넣기", height=200,
 
 if st.button("AI 수정 실행", type="primary") and opinions.strip():
     with st.spinner("Claude가 문안을 수정 중..."):
-        revs = revise(copies, opinions, _make_call_fn())
+        try:
+            revs = revise(copies, opinions, _make_call_fn())
+        except Exception as e:
+            st.error(f"AI 수정 실패: {e}. 잠시 후 [AI 수정 실행]을 다시 눌러주세요.")
+            st.stop()
     st.session_state["revs"] = {r.no: r for r in revs}
     # 매칭 실패 탐지
-    missing = referenced_numbers(opinions) - {c.no for c in copies}
+    copy_nos = {c.no for c in copies}
+    missing = referenced_numbers(opinions) - copy_nos
     if missing:
         st.warning(f"의견이 참조했지만 표에 없는 번호: {sorted(missing)}")
+    dropped = (referenced_numbers(opinions) & copy_nos) - set(st.session_state.get("revs", {}).keys())
+    if dropped:
+        st.warning(f"의견은 있으나 AI가 수정하지 않은 번호: {sorted(dropped)}")
 
 if "revs" in st.session_state:
     revs = st.session_state["revs"]
@@ -91,7 +103,7 @@ if "revs" in st.session_state:
     if len(over):
         st.error(f"제한 초과 문안 {len(over)}건 — 수정문을 줄여주세요: 번호 {list(over['번호'])}")
 
-    if st.button("엑셀 다운로드 생성", disabled=len(over) > 0):
+    if not len(over):
         revisions = {int(row["번호"]): row["수정문"] for _, row in edited.iterrows()}
         out = build_revised_workbook(raw, revisions)
         name = up.name.rsplit(".", 1)[0]

@@ -41,8 +41,17 @@ def parse_revisions(raw: str) -> list[Revision]:
     if m:
         text = m.group(1).strip()
     data = json.loads(text)
-    return [Revision(no=int(d["no"]), revised=str(d["revised"]),
-                     reason=str(d.get("reason", ""))) for d in data]
+    if not isinstance(data, list):
+        raise ValueError("AI 응답이 JSON 배열이 아닙니다")
+    revs = []
+    for d in data:
+        no = d.get("no")
+        revised = d.get("revised")
+        if no is None or revised is None:
+            continue
+        revs.append(Revision(no=int(no), revised=str(revised),
+                             reason=str(d.get("reason", ""))))
+    return revs
 
 
 def _over_limit(revs, limits):
