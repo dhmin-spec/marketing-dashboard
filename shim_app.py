@@ -28,19 +28,26 @@ def _gate() -> bool:
     return False
 
 
-def _resolve_model(client) -> str:
-    """계정에서 실제 쓸 수 있는 generateContent 모델을 골라 캐시한다.
-    특정 모델명 하드코딩으로 인한 404(폐기)를 피하기 위해 동적으로 선택.
-    GEMINI_MODEL 시크릿이 있으면 그것을 우선 사용."""
+_TRANSIENT = ("503", "unavailable", "429", "resource_exhausted",
+              "high demand", "overloaded", "try again later")
+
+
+def _is_transient(err: Exception) -> bool:
+    return any(t in str(err).lower() for t in _TRANSIENT)
+
+
+def _candidate_models(client) -> list[str]:
+    """flash 우선으로 정렬한 generateContent 가능 모델 목록.
+    GEMINI_MODEL 시크릿이 있으면 그것만 사용."""
     import re
     try:
         override = st.secrets["GEMINI_MODEL"]
     except Exception:
         override = None
     if override:
-        return override
-    if "gemini_model" in st.session_state:
-        return st.session_state["gemini_model"]
+        return [override]
+    if st.session_state.get("gemini_models"):
+        return st.session_state["gemini_models"]
 
     names = []
     for m in client.models.list():
@@ -61,18 +68,33 @@ def _resolve_model(client) -> str:
             s += float(mm.group(1))
         return s
 
-    chosen = max(names, key=score) if names else "gemini-flash-latest"
-    st.session_state["gemini_model"] = chosen
-    return chosen
+    ordered = sorted(names, key=score, reverse=True) or ["gemini-flash-latest"]
+    st.session_state["gemini_models"] = ordered
+    return ordered
 
 
 def _make_call_fn():
+    import time
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = _resolve_model(client)
+    models = _candidate_models(client)
 
     def call_fn(prompt: str) -> str:
-        resp = client.models.generate_content(model=model, contents=prompt)
-        return resp.text or ""
+        last = None
+        for model in models:
+            for attempt in range(3):  # 과부하 시 백오프 재시도
+                try:
+                    resp = client.models.generate_content(model=model, contents=prompt)
+                    st.session_state["gemini_model"] = model
+                    return resp.text or ""
+                except Exception as e:
+                    last = e
+                    if _is_transient(e):
+                        if attempt < 2:
+                            time.sleep(1.5 * (attempt + 1))
+                            continue
+                        break  # 이 모델은 계속 과부하 → 다음 후보로
+                    raise      # 그 외 오류는 즉시 표면화
+        raise last
 
     return call_fn
 
